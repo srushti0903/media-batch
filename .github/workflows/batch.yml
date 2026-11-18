@@ -1,0 +1,75 @@
+name: batch
+
+on:
+  schedule:
+    - cron: '5 8 * * *'
+    - cron: '30 21 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: make or test
+        required: true
+        default: test
+        type: choice
+        options: [test, make]
+
+concurrency:
+  group: batch
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  TZ: Asia/Kolkata
+  GH_TOKEN: ${{ github.token }}
+  RUNNER_REPO: ${{ github.repository }}
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup
+        env:
+          KENV: ${{ secrets.APP_ENV }}
+        run: |
+          umask 077
+          printf '%s\n' "$KENV" > .env
+          python3 boot.py > /dev/null
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Packages
+        timeout-minutes: 20
+        run: |
+          pip install -q -r requirements.txt > /dev/null 2>&1
+          mkdir -p ~/ffbin
+          if curl -fsSL --retry 3 --max-time 240 -o /tmp/ff.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz; then
+            tar -xJf /tmp/ff.tar.xz -C /tmp && cp /tmp/ffmpeg-*-static/ffmpeg /tmp/ffmpeg-*-static/ffprobe ~/ffbin/
+          else
+            sudo timeout 400 apt-get install -y -qq --no-install-recommends ffmpeg > /dev/null 2>&1 && cp "$(which ffmpeg)" "$(which ffprobe)" ~/ffbin/
+          fi
+          echo "$HOME/ffbin" >> "$GITHUB_PATH"
+          export PATH="$HOME/ffbin:$PATH"
+          (sudo timeout 300 apt-get install -y -qq --no-install-recommends fonts-noto-core > /dev/null 2>&1) || true
+          ffmpeg -version > /dev/null && google-chrome --version > /dev/null
+
+      - name: Work
+        timeout-minutes: 300
+        run: |
+          MODE="${{ inputs.mode }}"; [ -z "$MODE" ] && MODE=make
+          if [ "$MODE" = test ]; then python job.py test > run.log 2>&1 || touch failed
+          else python job.py cycle > run.log 2>&1 || touch failed; fi
+
+      - name: Log
+        if: always()
+        run: |
+          python job.py uplog run.log > /dev/null 2>&1 || true
+          test ! -f failed
