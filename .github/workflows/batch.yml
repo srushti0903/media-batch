@@ -49,7 +49,7 @@ jobs:
       - name: Packages
         timeout-minutes: 20
         run: |
-          pip install -q -r requirements.txt > /dev/null 2>&1
+          pip install -q -r requirements.txt
           mkdir -p ~/ffbin
           if curl -fsSL --retry 3 --max-time 240 -o /tmp/ff.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz; then
             tar -xJf /tmp/ff.tar.xz -C /tmp && cp /tmp/ffmpeg-*-static/ffmpeg /tmp/ffmpeg-*-static/ffprobe ~/ffbin/
@@ -59,7 +59,7 @@ jobs:
           echo "$HOME/ffbin" >> "$GITHUB_PATH"
           export PATH="$HOME/ffbin:$PATH"
           (sudo timeout 300 apt-get install -y -qq --no-install-recommends fonts-noto-core > /dev/null 2>&1) || true
-          ffmpeg -version > /dev/null && google-chrome --version > /dev/null
+          ffmpeg -version | head -1; google-chrome --version
 
       - name: Work
         timeout-minutes: 300
