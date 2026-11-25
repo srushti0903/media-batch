@@ -50,6 +50,8 @@ jobs:
         timeout-minutes: 20
         run: |
           pip install -q -r requirements.txt
+          # narrator voice check (voice_gemini.voice_check); optional: without it only the pitch test runs
+          pip install -q --extra-index-url https://download.pytorch.org/whl/cpu "torch==2.5.1+cpu" resemblyzer || echo "voice check packages skipped"
           mkdir -p ~/ffbin
           if curl -fsSL --retry 3 --max-time 240 -o /tmp/ff.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz; then
             tar -xJf /tmp/ff.tar.xz -C /tmp && cp /tmp/ffmpeg-*-static/ffmpeg /tmp/ffmpeg-*-static/ffprobe ~/ffbin/
